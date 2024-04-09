@@ -1,3 +1,7 @@
 *.keras
 
 assets/data
+scripts/__pycache__
+scripts/chess_brain_NN.pynb
+scripts/drafts.pynb
+scripts/evaluations.db

@@ -8,7 +8,6 @@ import pygame as pg
 import chess
 import ai
 import chessengine
-import Piece
 
 # endregion
 
