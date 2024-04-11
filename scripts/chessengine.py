@@ -21,36 +21,37 @@ class GameState:
             "a1":"R", "b1":"N", "c1":"B", "d1":"Q", "e1":"K", "f1":"B", "g1":"N", "h1":"R",
         }
 
-    def move_piece_ui(self, UCI: str) -> None:
-        """gets a UCI input and updates the internal dictionnary for visuals. Need to call before draw_game_state from main."""            
+    def move_piece_ui(self, move: chess.Move) -> None:
+        """gets a UCI from the move input and updates the internal dictionnary for visuals. Need to call before draw_game_state from main."""            
         
+        uci = move.uci()
         castling = ["e1g1", "e1c1", "e8g8", "e8c8"]
-        piece = self.board_dict[UCI[:2]]
+        piece = self.board_dict[uci[:2]]
 
         # additional logic for handling castling
-        if UCI in castling:
+        if uci in castling:
             if piece in "Kk":
                 # king move
-                self.board_dict[UCI[:2]] = "-"
-                self.board_dict[UCI[2:]] = piece
+                self.board_dict[uci[:2]] = "-"
+                self.board_dict[uci[2:]] = piece
                 # rook move
-                if UCI[2] == "c": # if castling queen side
-                    self.board_dict["a"+UCI[1]] = "-" # empty the rook square                    
+                if uci[2] == "c": # if castling queen side
+                    self.board_dict["a"+uci[1]] = "-" # empty the rook square                    
                     # move the correct rook
-                    if UCI[1] == "1":
+                    if uci[1] == "1":
                         self.board_dict["d1"] = "R"
                     else:
                         self.board_dict["d8"] = "r"
                 else: # castling king side
-                    self.board_dict["h"+UCI[1]] = "-" # empty the rook square                    
+                    self.board_dict["h"+uci[1]] = "-" # empty the rook square                    
                     # move the correct rook
-                    if UCI[1] == "1":
+                    if uci[1] == "1":
                         self.board_dict["f1"] = "R"
                     else:
                         self.board_dict["f8"] = "r"
         # otherwise mark the current square as empty and move the piece to the new square        
         else:
-            self.board_dict[UCI[:2]] = "-"
-            self.board_dict[UCI[2:]] = piece
+            self.board_dict[uci[:2]] = "-"
+            self.board_dict[uci[2:]] = piece
 
 

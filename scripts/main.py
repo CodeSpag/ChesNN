@@ -8,6 +8,7 @@ import pygame as pg
 import chess
 import ai
 import chessengine
+import threading
 
 # endregion
 
@@ -35,9 +36,11 @@ def main():
     global gs
     global sq_selected
     global player_clicks
+    global player_turn
     gs = chessengine.GameState()
     sq_selected = "temp" # string name for square
     player_clicks = [] # store sq_selected
+    player_turn = True # Initialize as player's turn
 
     # endregion
 
@@ -53,9 +56,18 @@ def main():
                 run = False
             # handle mouse click    
             elif event.type == pg.MOUSEBUTTONDOWN:
-                handle_click()
-
+                if player_turn: # Only handle clicks if it's the player's turn
+                    handle_click()
         
+        # Check if it's the player's turn and there are no illegal moves
+        if player_turn and not gs.board.is_checkmate() and len(player_clicks) == 2:
+            make_move(player_clicks) # Make the player's move
+
+        # If it's the AI's turn and the game is not over
+        if not player_turn and not gs.board.is_checkmate():
+            pg.display.flip() # force update the display before thiking about the move
+            draw_game_state()
+            ai_move() # Make the AI's move
         
         clock.tick(FPS) # set fixed FPS
         pg.display.flip()
@@ -92,37 +104,37 @@ def handle_click() -> None:
         sq_selected = sq_name
         player_clicks.append(sq_selected)
 
-    # if we clicked to squares, we want to move the piece
-    if len(player_clicks) == 2:
-        make_move(player_clicks)
-
-
 def make_move(moves: list) -> None:    
     """Handles move requests. If legal, update UI and game state, then reset click log"""
     global gs
+    global player_turn
+
     if gs.board.is_checkmate() == True: # prevents extra clicks after game over
         return
     
-    # concatenate both scares to get UCI move notation
+    # concatenate both squares to get UCI move notation
     move = moves[0]+moves[1]
     reset_click_log()
-    made_legal_move = False
     
     # make the move if its legal
     try:       
         gs.board.push_uci(move) # update board state
-        gs.move_piece_ui(move) # update UI dict
+        gs.move_piece_ui(chess.Move.from_uci(move)) # update UI dict
         draw_game_state() # draw the updated dict
-        made_legal_move = True    
+        player_turn = False
     except chess.IllegalMoveError: # catch illegal moves and notify the player
         print("Illegal move:", move)
-        pass
-        
-    if gs.board.is_checkmate() != True and made_legal_move == True:
-        ai_move = ai.ai_move(gs.board.fen()) # get a AI move
-        gs.board.push_uci(ai_move) # update board state
-        gs.move_piece_ui(ai_move) # update UI dict
-        draw_game_state() # draw the updated dict 
+ 
+
+def ai_move() -> None:
+    global gs
+    global player_turn
+
+    ai_move = ai.ai_move(gs.board) # get a AI move
+    gs.board.push(ai_move) # update board state
+    gs.move_piece_ui(ai_move) # update UI dict
+    draw_game_state() # draw the updated dict 
+    player_turn = True
 
 # Converts a click coordinate to UCI
 def get_square_uci(col: int, row: int) -> str:

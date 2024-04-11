@@ -8,7 +8,7 @@ It takes in a FEN notation and returns a UCI notation move decided by the AI.
 """
 
 # load model when file is imported
-model = keras.models.load_model("first_model_keep_training.keras")
+model = keras.models.load_model("./local/first_model_keep_training.keras")
 
 def fen2bitboard(fen: str, to_bits: bool=False) -> np.array:
     """
@@ -59,39 +59,77 @@ def fen2bitboard(fen: str, to_bits: bool=False) -> np.array:
         return np.packbits(bitboard)
     return bitboard
 
-def get_eval(bitboard: np.array) -> float:
-    """reshape the array, feed it to the model and returns an evaluation"""  
+def get_eval(board: chess.Board) -> float:
+    """Takes in a board, gets the bitboard from it, reshape the array, feed it to the model and returns an evaluation"""  
     
+    bitboard = fen2bitboard(board.fen())
     pos = np.reshape(bitboard, (1, 773)) # model expects a dimension for the batch size   
     return model.predict(pos)[0][0]
 
 
-def ai_move(fen: str) -> str:
-    """Takes a FEN notation board and returns a move in UCI notation.
-    For now it only looks at 1 position."""
+def ai_move(board: chess.Board) -> chess.Move:
+    """Takes a chess board and returns the best move. It picks the top 5 moves, goes down each line and choses the moves that leads to the best position."""
 
-    board = chess.Board(fen) # create a board for the chess library
-    bitboard = fen2bitboard(fen)
-    turn = bitboard[768] # where the turn is stored
-    
+    turn = board.turn #store the turn
 
     all_eval = []
     all_moves = []
-    # looks at all the legal moves in a given position
+    # looks at all the legal moves in a given position (legal_moves returns UCI)
     for move in board.legal_moves:
         all_moves.append(move) # store the move
         temp_board = board.copy() # make a temp copy of the board
         temp_board.push(move) # make the move on the temporary board
-        pred = get_eval(fen2bitboard(temp_board.fen())) # evaluate the position
+        pred = get_eval(temp_board) # evaluate the position
         all_eval.append(pred) # store the eval at the same index as the move
 
-    if turn == 1: #it's white's turn, get the highest eval
-        idx = np.argmax(all_eval)
-        print("ai eval for white:", all_eval[idx])
-    else:  # if it's black, get the lowest
-        idx = np.argmin(all_eval)
-        print("ai eval for black:", all_eval[idx])
+    if turn: # returns true if it's white's turn -> get the 5 highest eval
+        ind = np.argpartition(all_eval, -5)[-5:]
+    else:  # if it's black, get the 5 lowest
+        ind = np.argpartition(all_eval, 5)[:5]
 
-    out = all_moves[idx]
+    candidate_moves = [all_moves[i] for i in ind]
+    candidate_eval = []
+    
+    for move in candidate_moves:
+        temp_board = board.copy() # make a temp copy of the board
+        temp_board.push(move) # make the move on the temporary board
+        candidate_eval.append(explore_move(temp_board, 5)) # go down the lines and see what's the eval
+    
+    if turn:
+        best = np.argmax(candidate_eval)
+    else:
+        best = np.argmin(candidate_eval)
 
-    return out.uci()
+    return candidate_moves[best]
+
+
+
+def explore_move(board: chess.Board, depth=4) -> float:
+    """Takes in a board states and makes the best move for each sides until depth is reached.
+    Returns a float for the resulting position's eval."""
+
+
+    local_board = board.copy() # copy the board to avoid making changes top the real
+
+    for _ in range(depth):
+        all_eval = []
+        all_moves = []
+        turn = local_board.turn
+
+        # looks at all the legal moves in a given position
+        for move in local_board.legal_moves:
+            all_moves.append(move) # store the move
+            temp_board = local_board.copy() # make a temp copy of the board
+            temp_board.push(move) # make the move on the temporary board
+            pred = get_eval(temp_board) # evaluate the position
+            all_eval.append(pred) # store the eval at the same index as the move
+
+        if turn: # returns true if it's white's turn -> get the 5 highest eval
+            ind = np.argmax(all_eval)
+        else:  # if it's black, get the 5 lowest
+            ind = np.argmin(all_eval)
+
+        local_board.push(all_moves[ind]) # push the chosen move to the board
+
+    # return the eval of the final position
+    return get_eval(local_board)
